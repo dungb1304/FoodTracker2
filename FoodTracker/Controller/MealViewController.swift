@@ -10,7 +10,7 @@ import UIKit
 import os.log
 
 class MealViewController: UIViewController, UITextFieldDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-
+    
     @IBOutlet weak var nameTextField: UITextField!    
     @IBOutlet weak var photoImageView: UIImageView!
     @IBOutlet weak var ratingControl: RatingControl!    
@@ -20,31 +20,28 @@ class MealViewController: UIViewController, UITextFieldDelegate, UIImagePickerCo
      This value is either passed by `MealTableViewController` in `prepare(for:sender:)`
      or constructed as part of adding a new meal.
      */
-    var meal: Meal?
+    var index: Int?
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-         // Handle the text field’s user input through delegate callbacks.
+        // Handle the text field’s user input through delegate callbacks.
         nameTextField.delegate = self
-        
-        // Set up views if editing an existing Meal.
-        if let meal = meal {
-            navigationItem.title = meal.name
-            nameTextField.text = meal.name
-            photoImageView.image = meal.photo
-            ratingControl.rating = meal.rating
+        if let indexPath = index {
+            navigationItem.title = DataService.shared.meals[indexPath].name
+            nameTextField.text = DataService.shared.meals[indexPath].name
+            photoImageView.image = DataService.shared.meals[indexPath].photo
+            ratingControl.rating = DataService.shared.meals[indexPath].rating
         }
-        
         //Enable the Save button only if the text field has valid name
         updateSaveButtonStates()
     }
-
+    
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         // Dispose of any resources that can be recreated.
     }
-
+    
     
     
     //MARK: UITextFieldDelegate
@@ -63,7 +60,7 @@ class MealViewController: UIViewController, UITextFieldDelegate, UIImagePickerCo
         updateSaveButtonStates()
         navigationItem.title = textField.text
     }
-
+    
     //MARK: UIImagePickerControllerDelegate
     func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
         //Dismiss the picker if the user canceled
@@ -87,38 +84,41 @@ class MealViewController: UIViewController, UITextFieldDelegate, UIImagePickerCo
     
     //MARK: Navigation
     
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        let a = MealTableViewController()
+        a.tableView.reloadData()
+    }
+    
     @IBAction func cancel(_ sender: UIBarButtonItem) {
         // Depending on style of presentation (modal or push presentation), this view controller needs to be dismissed in two different ways.
-        let isPresentingInAddMealMode = presentingViewController is UINavigationController
-        
-        if isPresentingInAddMealMode {
-            dismiss(animated: true, completion: nil)
-        }
-        else if let owningNavigationController = navigationController{
-            owningNavigationController.popViewController(animated: true)
-        }
-        else {
-            fatalError("The MealViewController is not inside a navigation controller.")
-        }
+        navigationController?.popViewController(animated: true)
     }
     
     // This method lets you configure a view controller before it's presented.
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        super.prepare(for: segue, sender: sender)
+    
+    
+    @IBAction func saveData(_ sender: UIBarButtonItem) {
         // Configure the destination view controller only when the save button is pressed.
-        guard let button = sender as? UIBarButtonItem, button === saveButton else {
+        guard sender === saveButton else {
             os_log("The save button was not pressed, cancelling", log: OSLog.default, type: .debug)
             return
         }
         
-        let name = nameTextField.text ?? ""
-        let photo = photoImageView.image
-        let rating = ratingControl.rating
+        if let indexPath = index {
+            DataService.shared.meals[indexPath].name = nameTextField.text ?? ""
+            DataService.shared.meals[indexPath].photo = photoImageView.image
+            DataService.shared.meals[indexPath].rating = ratingControl.rating
+            
+        } else {
+            let meal = Meal(name: nameTextField.text!, photo: photoImageView.image, rating: ratingControl.rating)
+            DataService.shared.newMeal(meal: meal!)
+            
+        }
         
-        // Set the meal to be passed to MealTableViewController after the unwind segue.
-        meal = Meal(name: name, photo: photo, rating: rating)
+        navigationController?.popViewController(animated: true)
+        
     }
-    
     
     //MARK: Action
     
@@ -137,7 +137,7 @@ class MealViewController: UIViewController, UITextFieldDelegate, UIImagePickerCo
         present(imagePickerController, animated: true, completion: nil)
     }
     
-  
+    
     //MARK: Private methods
     private func updateSaveButtonStates() {
         //Disable the Save button if the text field is empty
